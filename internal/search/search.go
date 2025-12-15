@@ -1021,49 +1021,27 @@ func (s *Searcher) handleConnectionModal() error {
 func (s *Searcher) sendMessageInOverlay(name string) error {
 	s.logger.Info("attempting to send message in overlay", "name", name)
 
-	// Wait for overlay to appear
-	s.logger.Info("waiting for message overlay to appear")
-	time.Sleep(2000 * time.Millisecond) // Increased from 1500ms
+	// Wait for overlay/compose dialog to fully load
+	s.logger.Info("waiting for message compose dialog to load")
+	time.Sleep(3000 * time.Millisecond) // Increased to 3 seconds for dialog loading
 
-	// Selectors for NEW MESSAGE compose dialog (opened from search results)
-	overlaySelectors := []string{
-		"div.msg-form__contenteditable",      // Message input in compose dialog
-		"[aria-label='Write a message']",     // Write a message input
-		".msg-overlay-bubble-header",         // Chat bubble header
-		"aside.msg-overlay-bubble",           // Chat bubble container
-		"div[data-testid='compose-message']", // Compose dialog
-		"h2:has-text('New message')",         // New message header
-	}
+	// Log current page state for debugging
+	url := s.page.MustInfo().URL
+	s.logger.Info("current page URL", "url", url)
 
-	var overlayFound bool
-	for _, sel := range overlaySelectors {
-		s.logger.Info("checking for overlay container", "selector", sel)
-		if elems, err := s.page.Elements(sel); err == nil && len(elems) > 0 {
-			s.logger.Info("message overlay container found!", "selector", sel)
-			overlayFound = true
-			break
-		}
-	}
-
-	if !overlayFound {
-		s.logger.Warn("message overlay container not found - overlay may not have opened")
-		return fmt.Errorf("message overlay did not appear")
-	}
-
-	// Wait a bit more for the form to fully load
-	time.Sleep(500 * time.Millisecond)
+	// Skip overlay detection - directly search for input (more reliable)
+	// The compose dialog should be open by now
 
 	// Try to find message input with retries
 	var inputElem *rod.Element
 	inputSelectors := []string{
 		"div.msg-form__contenteditable[contenteditable='true']",
-		".msg-form__contenteditable[role='textbox']",
-		"div[role='textbox'][aria-label*='Write a message']",
-		"div[contenteditable='true'][role='textbox']",
 		".msg-form__contenteditable",
+		"div[aria-label*='Write a message']",
+		"div[contenteditable='true'][role='textbox']",
 		"div[role='textbox']",
-		"div[contenteditable='true']",
 	}
+
 
 	// Retry finding input only 2 times - fail fast if blocked
 	maxRetries := 2
