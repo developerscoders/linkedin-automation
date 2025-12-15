@@ -1,0 +1,94 @@
+linkedin:
+  email: pallavburnwal12345@gmail.com
+  password: PaLlAv2712345@#
+
+storage:
+  mongodb:
+    uri: "mongodb+srv://pallavburnwal_db_user:osjjNQZxSYmmhEMf@cluster0.zohgcwt.mongodb.net" # Override with MONGODB_URI
+    database: "linkedin_automation"  # Override with MONGODB_DATABASE
+    timeout_seconds: 10
+
+browser:
+  headless: false
+  user_agent_rotation: true
+  proxy_url: ""
+  viewport:
+    width: 1920
+    height: 1080
+  timezone: "America/New_York"
+  language: "en-US"
+
+limits:
+  daily_requests: 50
+  weekly_requests: 150
+  hourly_requests: 10
+  hourly_messages: 8
+  daily_messages: 40
+  min_action_delay_seconds: 30
+  max_action_delay_seconds: 120
+  max_continuous_hours: 2
+  mandatory_break_minutes: 15
+
+stealth:
+  mouse:
+    speed_range: [100, 400]
+    overshoot_range: [3, 8]
+    correction_probability: 0.1
+  
+  timing:
+    think_time_range: [2, 8]
+    read_wpm_range: [200, 250]
+    scroll_think_range: [1, 3]
+  
+  typing:
+    wpm_range: [40, 80]
+    typo_probability: 0.02
+  
+  scroll:
+    back_probability: 0.15
+    hover_probability: 0.2
+  
+  behavior:
+    random_hover_probability: 0.25
+    idle_movement_probability: 0.15
+    reading_pattern_probability: 0.10
+
+schedule:
+  timezone: "America/New_York"
+  start_hour: 9
+  end_hour: 17
+  work_days: ["monday", "tuesday", "wednesday", "thursday", "friday"]
+  breaks:
+    - start_hour: 10
+      end_hour: 10
+      duration_minutes: 15
+    - start_hour: 12
+      end_hour: 13
+      duration_minutes: 60
+    - start_hour: 15
+      end_hour: 15
+      duration_minutes: 10
+
+search:
+  keywords: 
+    - "software engineer"
+    - "frontend developer"
+    - "full stack"
+  max_results_per_search: 100
+  max_pages: 5
+  cache_duration_hours: 24
+
+messaging:
+  templates:
+    - name: "intro"
+      content: "Hi {{.Name}}, I noticed you work at {{.Company}}. I'd love to connect!"
+    - name: "follow_up"
+      content: "Thanks for connecting, {{.Name}}! Looking forward to staying in touch."
+
+logging:
+  level: "info"
+  format: "json"
+  output: "file"
+  file_path: "./logs/bot.log"
+  max_size_mb: 100
+  max_backups: 7
