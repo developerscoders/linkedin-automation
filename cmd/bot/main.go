@@ -16,6 +16,7 @@ import (
 	"linkedin-automation/internal/storage"
 	"linkedin-automation/pkg/logger"
 
+	"github.com/go-rod/rod"
 	"github.com/spf13/cobra"
 )
 
@@ -27,6 +28,7 @@ type Bot struct {
 	conn     *connection.Requester
 	msg      *messaging.Sender
 	detector *messaging.Detector
+	acceptor *connection.Acceptor
 	storage  *storage.DB
 
 	// Stealth components
@@ -97,21 +99,34 @@ func (b *Bot) Initialize() error {
 	page := b.browser.MustPage()
 
 	// Authenticator
-	b.auth = auth.NewAuthenticator(page, b.storage, b.logger)
+	b.auth = auth.NewAuthenticator(page, b.storage, b.logger, b.mouse)
 
 	// Attempt restore
 	if err := b.auth.RestoreSession(); err != nil {
-		b.logger.Info("session restore failed/missing, logging in")
-		if err := b.auth.Login(context.Background(), b.config.LinkedIn.Email, b.config.LinkedIn.Password); err != nil {
-			return err
+		b.logger.Info("session restore failed/missing, checking current state")
+
+		// Before forcing login, check if already logged in
+		page.MustNavigate("https://www.linkedin.com/feed/")
+		time.Sleep(2 * time.Second)
+
+		// Check if we're already logged in by looking for profile menu
+		if has, _, _ := page.Has(".global-nav__me"); has {
+			b.logger.Info("already logged in, no need to login again")
+		} else {
+			// Not logged in, proceed with login
+			b.logger.Info("not logged in, proceeding with login")
+			if err := b.auth.Login(context.Background(), b.config.LinkedIn.Email, b.config.LinkedIn.Password); err != nil {
+				return err
+			}
 		}
 	}
 
 	// Initialize components
-	b.search = search.NewSearcher(page, b.scroller, b.timing, b.mouse, b.typer, b.storage, b.logger)
+	b.search = search.NewSearcher(page, b.scroller, b.timing, b.mouse, b.typer, b.storage, b.logger, b.config)
 
 	limiter := connection.NewAdaptiveLimiter(b.config.Limits.DailyRequests, b.config.Limits.WeeklyRequests, b.config.Limits.HourlyRequests)
 	b.conn = connection.NewRequester(page, limiter, b.mouse, b.typer, b.timing, b.scroller, b.storage, b.logger)
+	b.acceptor = connection.NewAcceptor(page, b.mouse, b.timing, b.storage, b.logger)
 
 	b.msg = messaging.NewSender(page, b.typer, b.mouse, b.storage, b.logger)
 	// Add templates
@@ -136,24 +151,75 @@ func (b *Bot) Close() {
 // Actions
 
 func (b *Bot) RunSearch() error {
-	keywords := b.config.Search.Keywords
-	if len(keywords) == 0 {
-		keywords = []string{"software engineer", "developer", "go_lang"} // Default fallback
-		b.logger.Warn("no keywords in config, using defaults", "keywords", keywords)
+	ctx := context.Background()
+
+	// Process Names FIRST - search for specific people, try Connect or Message
+	if len(b.config.Search.Names) > 0 {
+		b.logger.Info("processing name searches", "count", len(b.config.Search.Names))
+		for _, name := range b.config.Search.Names {
+			b.logger.Info("searching for person", "name", name)
+
+			criteria := search.Criteria{
+				Keywords: []string{name},
+				MaxPages: 1, // Usually one page is enough for a specific name
+			}
+
+			// For names, the search will internally try Connect, then fallback to Message
+			if err := b.search.Search(ctx, criteria, nil); err != nil {
+				b.logger.Error("name search failed", "name", name, "error", err)
+			} else {
+				b.logger.Info("name search completed", "name", name)
+			}
+
+			b.timing.RandomDelay()
+		}
 	}
 
-	criteria := search.Criteria{
-		Keywords: keywords,
-		MaxPages: b.config.Search.MaxPages,
+	// Process Jobs SECOND - search for job titles, primarily try to connect
+	if len(b.config.Search.Jobs) > 0 {
+		b.logger.Info("processing job searches", "count", len(b.config.Search.Jobs))
+		for _, job := range b.config.Search.Jobs {
+			b.logger.Info("searching for job", "job", job)
+
+			criteria := search.Criteria{
+				Keywords: []string{job},
+				MaxPages: b.config.Search.MaxPages,
+			}
+
+			// For jobs, the search will internally try Connect, then fallback to Message
+			if err := b.search.Search(ctx, criteria, nil); err != nil {
+				b.logger.Error("job search failed", "job", job, "error", err)
+			} else {
+				b.logger.Info("job search completed", "job", job)
+			}
+
+			b.timing.RandomDelay()
+		}
 	}
 
-	b.logger.Info("starting search", "keywords", criteria.Keywords, "max_pages", criteria.MaxPages)
-	profiles, err := b.search.Search(context.Background(), criteria)
-	if err != nil {
-		return err
+	// Legacy keywords support (if no jobs/names defined)
+	if len(b.config.Search.Jobs) == 0 && len(b.config.Search.Names) == 0 {
+		keywords := b.config.Search.Keywords
+		if len(keywords) == 0 {
+			keywords = []string{"software engineer"}
+			b.logger.Warn("no search config found, using defaults", "keywords", keywords)
+		}
+
+		for _, k := range keywords {
+			criteria := search.Criteria{
+				Keywords: []string{k},
+				MaxPages: b.config.Search.MaxPages,
+			}
+
+			b.logger.Info("starting legacy keyword search", "keyword", k)
+			if err := b.search.Search(ctx, criteria, nil); err != nil {
+				b.logger.Error("legacy search failed", "keyword", k, "error", err)
+			}
+
+			b.timing.RandomDelay()
+		}
 	}
 
-	b.logger.Info("search completed", "profiles_found", len(profiles))
 	return nil
 }
 
@@ -179,8 +245,39 @@ func (b *Bot) RunConnect() error {
 		// Use "intro" template if variable supported, or just use plain note
 		note := fmt.Sprintf("Hi %s, I noticed we share similar interests in tech. I'd love to connect!", p.Name)
 		// Ideally pick a random template from config
+		ctx := context.Background()
 
-		if err := b.conn.SendRequest(context.Background(), p, note); err != nil {
+		// Step 1: search by name to get the freshest profile URL
+		// We use a capture variable to get the profile from the callback
+		var searchTarget *storage.Profile
+
+		if p.Name != "" {
+			criteria := search.Criteria{
+				Keywords: []string{p.Name},
+				MaxPages: 1,
+			}
+			// We only care about the first result that matches loosely
+			_ = b.search.Search(ctx, criteria, func(card *rod.Element, foundProfile *storage.Profile) error {
+				if searchTarget == nil {
+					// Check if name is similar? For now just take first.
+					searchTarget = foundProfile
+					// We can stop search by returning special error or just let it finish (maxPages 1 is fast)
+				}
+				return nil
+			})
+
+			if searchTarget != nil {
+				b.logger.Info("resolved profile via search", "profile", p.Name, "url", searchTarget.URL)
+				// Update P with fresh URL
+				p.URL = searchTarget.URL
+			} else {
+				b.logger.Warn("no search results, using stored URL", "profile", p.Name)
+			}
+		}
+
+		// Step 2: send request using (potentially updated) P
+		// We use the page navigation method since we don't have the card element from the search loop above preserved (it's gone after search finishes)
+		if err := b.conn.SendRequest(ctx, p, note); err != nil {
 			b.logger.Error("failed to connect", "profile", p.Name, "error", err)
 		} else {
 			b.logger.Info("connection request sent", "profile", p.Name)
@@ -205,6 +302,19 @@ func (b *Bot) RunMessage() error {
 			b.logger.Error("failed to message", "profile", p.Name, "error", err)
 		}
 		b.timing.RandomDelay()
+	}
+	return nil
+}
+
+func (b *Bot) RunAccept() error {
+	maxAccepts := b.config.Limits.HourlyRequests
+	if maxAccepts <= 0 {
+		maxAccepts = 10
+	}
+
+	b.logger.Info("starting accept invitations", "limit", maxAccepts)
+	if err := b.acceptor.AcceptInvitations(context.Background(), maxAccepts); err != nil {
+		return err
 	}
 	return nil
 }
@@ -281,6 +391,11 @@ func main() {
 	rootCmd.AddCommand(&cobra.Command{
 		Use:  "run",
 		RunE: runCmd(func(b *Bot) error { return b.RunFull() }),
+	})
+
+	rootCmd.AddCommand(&cobra.Command{
+		Use:  "accept",
+		RunE: runCmd(func(b *Bot) error { return b.RunAccept() }),
 	})
 
 	if err := rootCmd.Execute(); err != nil {

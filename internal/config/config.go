@@ -7,15 +7,15 @@ import (
 )
 
 type Config struct {
-	LinkedIn   LinkedInConfig  `yaml:"linkedin"`
-	Browser    BrowserConfig   `yaml:"browser"`
-	Limits     LimitsConfig    `yaml:"limits"`
-	Stealth    StealthConfig   `yaml:"stealth"`
-	Schedule   ScheduleConfig  `yaml:"schedule"`
-	Search     SearchConfig    `yaml:"search"`
-	Messaging  MessagingConfig `yaml:"messaging"`
-	Storage    StorageConfig   `yaml:"storage"`
-	Logging    LoggingConfig   `yaml:"logging"`
+	LinkedIn  LinkedInConfig  `yaml:"linkedin"`
+	Browser   BrowserConfig   `yaml:"browser"`
+	Limits    LimitsConfig    `yaml:"limits"`
+	Stealth   StealthConfig   `yaml:"stealth"`
+	Schedule  ScheduleConfig  `yaml:"schedule"`
+	Search    SearchConfig    `yaml:"search"`
+	Messaging MessagingConfig `yaml:"messaging"`
+	Storage   StorageConfig   `yaml:"storage"`
+	Logging   LoggingConfig   `yaml:"logging"`
 }
 
 type LinkedInConfig struct {
@@ -100,7 +100,9 @@ type BreakConfig struct {
 }
 
 type SearchConfig struct {
-	Keywords            []string `yaml:"keywords"`
+	Keywords            []string `yaml:"keywords"` // Legacy, for backwards compatibility
+	Jobs                []string `yaml:"jobs"`     // Job titles to search for connections
+	Names               []string `yaml:"names"`    // Specific names to search and message
 	MaxResultsPerSearch int      `yaml:"max_results_per_search"`
 	MaxPages            int      `yaml:"max_pages"`
 	CacheDurationHours  int      `yaml:"cache_duration_hours"`

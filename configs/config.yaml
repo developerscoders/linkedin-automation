@@ -15,7 +15,7 @@ browser:
   viewport:
     width: 1920
     height: 1080
-  timezone: "America/New_York"
+  timezone: "Asia/Kolkata"
   language: "en-US"
 
 limits:
@@ -24,14 +24,14 @@ limits:
   hourly_requests: 10
   hourly_messages: 8
   daily_messages: 40
-  min_action_delay_seconds: 30
-  max_action_delay_seconds: 120
+  min_action_delay_seconds: 5
+  max_action_delay_seconds: 10
   max_continuous_hours: 2
-  mandatory_break_minutes: 15
+  mandatory_break_minutes: 2
 
 stealth:
   mouse:
-    speed_range: [100, 400]
+    speed_range: [200, 400]
     overshoot_range: [3, 8]
     correction_probability: 0.1
   
@@ -41,7 +41,7 @@ stealth:
     scroll_think_range: [1, 3]
   
   typing:
-    wpm_range: [40, 80]
+    wpm_range: [20, 40]
     typo_probability: 0.02
   
   scroll:
@@ -54,26 +54,25 @@ stealth:
     reading_pattern_probability: 0.10
 
 schedule:
-  timezone: "America/New_York"
-  start_hour: 9
-  end_hour: 17
+  timezone: "Asia/Kolkata"
+  start_hour: 0
+  end_hour: 24
   work_days: ["monday", "tuesday", "wednesday", "thursday", "friday"]
   breaks:
-    - start_hour: 10
-      end_hour: 10
+    - start_hour: 0
+      end_hour: 12
       duration_minutes: 15
     - start_hour: 12
-      end_hour: 13
+      end_hour: 15
       duration_minutes: 60
     - start_hour: 15
-      end_hour: 15
+      end_hour: 24
       duration_minutes: 10
 
 search:
-  keywords: 
-    - "software engineer"
-    - "frontend developer"
-    - "full stack"
+  keywords:
+    - "lokesh lalwani"
+    - "Software engineer"
   max_results_per_search: 100
   max_pages: 5
   cache_duration_hours: 24
@@ -81,7 +80,7 @@ search:
 messaging:
   templates:
     - name: "intro"
-      content: "Hi {{.Name}}, I noticed you work at {{.Company}}. I'd love to connect!"
+      content: "Hi {{.Name}}, I noticed you Study at Chandigarh University. I'd love to connect with you!"
     - name: "follow_up"
       content: "Thanks for connecting, {{.Name}}! Looking forward to staying in touch."
 

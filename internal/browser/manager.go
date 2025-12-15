@@ -3,16 +3,17 @@ package browser
 import (
 	"fmt"
 
+	"linkedin-automation/internal/config"
+
 	"github.com/go-rod/rod"
 	"github.com/go-rod/rod/lib/launcher"
 	"github.com/go-rod/rod/lib/proto"
 	"github.com/go-rod/stealth"
-	"linkedin-automation/internal/config"
 )
 
 type Manager struct {
-	browser *rod.Browser
-	config  *config.BrowserConfig
+	browser  *rod.Browser
+	config   *config.BrowserConfig
 	launcher *launcher.Launcher
 }
 
@@ -41,23 +42,22 @@ func NewManager(cfg *config.BrowserConfig) (*Manager, error) {
 	browser := rod.New().ControlURL(u).MustConnect()
 
 	return &Manager{
-		browser: browser,
-		config:  cfg,
+		browser:  browser,
+		config:   cfg,
 		launcher: l,
 	}, nil
 }
 
 func (m *Manager) MustPage() *rod.Page {
 	page := m.browser.MustPage()
-	
+
 	// Apply basic stealth (stealth library)
 	page.MustEvalOnNewDocument(stealth.JS)
 
 	// Apply custom stealth
 	if err := m.ApplyStealth(page); err != nil {
-		// In a real app we might handle this better, but MustPage usually panics on failure
-		// For now we just log or ignore if we can't return error
-		fmt.Printf("Error applying stealth: %v\n", err)
+		// Log detailed error but don't panic, as some stealth scripts might fail non-critically
+		fmt.Printf("Warning: Failed to apply some stealth scripts: %v. Continuing...\n", err)
 	}
 
 	// Set viewport

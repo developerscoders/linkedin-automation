@@ -1,10 +1,8 @@
 package auth
 
 import (
-	"bufio"
 	"context"
 	"fmt"
-	"os"
 	"time"
 
 	"linkedin-automation/internal/stealth"
@@ -20,14 +18,16 @@ type Authenticator struct {
 	storage *storage.DB
 	logger  logger.Logger
 	stealth *stealth.Typer // Basic dependency for typing
+	mouse   *stealth.Mouse
 }
 
-func NewAuthenticator(page *rod.Page, storage *storage.DB, logger logger.Logger) *Authenticator {
+func NewAuthenticator(page *rod.Page, storage *storage.DB, logger logger.Logger, mouse *stealth.Mouse) *Authenticator {
 	return &Authenticator{
 		page:    page,
 		storage: storage,
 		logger:  logger,
 		stealth: stealth.NewTyper(), // Just using Typer locally or inject it
+		mouse:   mouse,
 	}
 }
 
@@ -39,30 +39,45 @@ func (a *Authenticator) Login(ctx context.Context, email, password string) error
 	a.page.MustWaitLoad()
 
 	// Human-like wait
-	time.Sleep(60 * time.Second)
+	time.Sleep(5 * time.Second)
+
+	moveToCenter := func(elem *rod.Element) {
+		if elem == nil {
+			return
+		}
+		box := elem.MustShape().Box()
+		// Move cursor to center of the element to mimic human behavior
+		if a.mouse != nil {
+			a.mouse.MoveTo(a.page, stealth.Point{X: box.X + box.Width/2, Y: box.Y + box.Height/2})
+		}
+	}
 
 	// Accept cookies if present (EU)
 	// Placeholder: check for cookie banner and click accept if needed
 
 	// Type Email
 	emailInput := a.page.MustElement("#username")
+	moveToCenter(emailInput)
 	if err := a.stealth.TypeHumanLike(emailInput, email, 0); err != nil {
 		return fmt.Errorf("failed to type email: %w", err)
 	}
 
-	time.Sleep(5 * time.Second)
+	time.Sleep(20 * time.Millisecond)
 
 	// Type Password
 	passInput := a.page.MustElement("#password")
+	moveToCenter(passInput)
 	if err := a.stealth.TypeHumanLike(passInput, password, 0); err != nil {
 		return fmt.Errorf("failed to type password: %w", err)
 	}
 
-	time.Sleep(5 * time.Second)
+	time.Sleep(2 * time.Second)
 	// wait := a.page.WaitNavigation(nil)
 
 	// Click Login
-	a.page.MustElement("button[type='submit'].btn__primary--large").MustClick()
+	loginBtn := a.page.MustElement("button[type='submit'].btn__primary--large")
+	moveToCenter(loginBtn)
+	loginBtn.MustClick()
 
 	// Wait for navigation
 	// a.page.MustWaitLoad()
@@ -85,7 +100,7 @@ func (a *Authenticator) Login(ctx context.Context, email, password string) error
 	// Verify login success
 	// Usually checking for feed or specific nav element
 	// Wait a bit for redirect
-	time.Sleep(60 * time.Second)
+	time.Sleep(3 * time.Second)
 
 	if a.page.MustInfo().URL == "https://www.linkedin.com/feed/" ||
 		a.page.MustInfo().URL == "https://www.linkedin.com/" {
@@ -147,18 +162,19 @@ func (a *Authenticator) RestoreSession() error {
 		return err
 	}
 
-	// Navigate to verify
-	a.page.MustNavigate("https://www.linkedin.com/")
-	fmt.Println("🔐 Complete LinkedIn phone/email verification now.")
-	fmt.Println("⏸ Browser will stay open. Press ENTER when done...")
+	// Navigate to verify session quietly
+	a.page.MustNavigate("https://www.linkedin.com/feed/")
+	// Short, human-like wait
+	time.Sleep(3 * time.Second)
 
-	bufio.NewReader(os.Stdin).ReadBytes('\n')
-
-	// Don't wait too long, just check if we are redirected to login or stay on feed
-	time.Sleep(60 * time.Second)
-
+	// If top nav is present, consider session valid
 	if has, _, _ := a.page.Has(".global-nav__me"); has {
-		return nil // Session valid
+		return nil
+	}
+
+	// If redirected to login, treat as invalid session
+	if info := a.page.MustInfo(); info.URL != "" && info.URL != "https://www.linkedin.com/feed/" {
+		return fmt.Errorf("session invalid or expired")
 	}
 
 	return fmt.Errorf("session invalid or expired")
