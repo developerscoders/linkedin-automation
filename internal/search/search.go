@@ -1030,7 +1030,7 @@ func (s *Searcher) sendMessageInOverlay(name string) error {
 	s.logger.Info("using JavaScript to find message input")
 
 	inputFound, err := s.page.Eval(`() => {
-		const input = document.querySelector('.msg-form__contenteditable[contenteditable="true"]');
+		const input = document.querySelector('div.msg-form__contenteditable[role="textbox"][contenteditable="true"]');
 		if (input) {
 			input.focus();
 			return true;
@@ -1051,7 +1051,7 @@ func (s *Searcher) sendMessageInOverlay(name string) error {
 	s.logger.Info("message input found via JavaScript, getting element")
 
 	// Get the input element using rod selector
-	inputElem, err2 := s.page.Element(".msg-form__contenteditable[contenteditable='true']")
+	inputElem, err2 := s.page.Element("div.msg-form__contenteditable[role='textbox'][contenteditable='true']")
 	err = err2
 	if err != nil {
 		s.logger.Warn("failed to get input element", "error", err)
