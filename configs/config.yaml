@@ -1,10 +1,10 @@
 linkedin:
-  email: YourLinkedInEmail
-  password: YourlinkedInPass
+  email: pallavburnwal12345@gmail.com
+  password: PaLlAv2712345@#
 
 storage:
   mongodb:
-    uri: "mongodb_connection_url" # Override with MONGODB_URI
+    uri: "mongodb+srv://pallavburnwal_db_user:osjjNQZxSYmmhEMf@cluster0.zohgcwt.mongodb.net" # Override with MONGODB_URI
     database: "linkedin_automation"  # Override with MONGODB_DATABASE
     timeout_seconds: 10
 
@@ -13,8 +13,8 @@ browser:
   user_agent_rotation: true
   proxy_url: ""
   viewport:
-    width: 1920
-    height: 1080
+    width: 1280
+    height: 720
   timezone: "Asia/Kolkata"
   language: "en-US"
 

@@ -1021,73 +1021,41 @@ func (s *Searcher) handleConnectionModal() error {
 func (s *Searcher) sendMessageInOverlay(name string) error {
 	s.logger.Info("attempting to send message in overlay", "name", name)
 
-	// Wait for overlay/compose dialog to fully load
-	s.logger.Info("waiting for message compose dialog to load")
-	time.Sleep(3000 * time.Millisecond) // Increased to 3 seconds for dialog loading
+	time.Sleep(3000 * time.Millisecond)
 
-	// Log current page state for debugging
 	url := s.page.MustInfo().URL
 	s.logger.Info("current page URL", "url", url)
 
-	// Skip overlay detection - directly search for input (more reliable)
-	// The compose dialog should be open by now
+	// Use JavaScript to find and focus the message input
+	s.logger.Info("using JavaScript to find message input")
 
-	// Try to find message input with retries
-	var inputElem *rod.Element
-	inputSelectors := []string{
-		"div.msg-form__contenteditable[contenteditable='true']",
-		".msg-form__contenteditable",
-		"div[aria-label*='Write a message']",
-		"div[contenteditable='true'][role='textbox']",
-		"div[role='textbox']",
+	inputFound, err := s.page.Eval(`() => {
+		const input = document.querySelector('.msg-form__contenteditable[contenteditable="true"]');
+		if (input) {
+			input.focus();
+			return true;
+		}
+		return false;
+	}`)
+
+	if err != nil || !inputFound.Value.Bool() {
+		s.logger.Warn("message input not found via JavaScript", "error", err)
+		// Try to close the dialog
+		s.page.Eval(`() => {
+			const closeBtn = document.querySelector('button[aria-label*="Close"]');
+			if (closeBtn) closeBtn.click();
+		}`)
+		return fmt.Errorf("message input not found")
 	}
 
+	s.logger.Info("message input found via JavaScript, getting element")
 
-	// Retry finding input only 2 times - fail fast if blocked
-	maxRetries := 2
-	for attempt := 1; attempt <= maxRetries; attempt++ {
-		s.logger.Info("searching for message input", "attempt", attempt)
-
-		for _, sel := range inputSelectors {
-			s.logger.Info("checking selector", "selector", sel, "attempt", attempt)
-			// Use NON-BLOCKING Elements() instead of blocking Element()
-			if elems, err := s.page.Elements(sel); err == nil && len(elems) > 0 {
-				elem := elems.First()
-				s.logger.Info("found element", "selector", sel, "attempt", attempt)
-				if v, _ := elem.Visible(); v {
-					s.logger.Info("element is visible - found message input!", "selector", sel, "attempt", attempt)
-					inputElem = elem
-					break
-				} else {
-					s.logger.Info("element found but not visible", "selector", sel)
-				}
-			} else {
-				s.logger.Info("selector not found", "selector", sel)
-			}
-		}
-
-		if inputElem != nil {
-			break
-		}
-
-	}
-
-	if inputElem == nil {
-		s.logger.Warn("GIVING UP - message input blocked after retries, closing overlay")
-		// Close the stuck message overlay
-		closeSelectors := []string{
-			".msg-overlay-bubble-header__control--close-btn",
-			"button[data-control-name='overlay.close_conversation_window']",
-		}
-		for _, sel := range closeSelectors {
-			if closeBtn, err := s.page.Element(sel); err == nil {
-				s.logger.Info("clicking close button on stuck overlay")
-				closeBtn.MustClick()
-				time.Sleep(300 * time.Millisecond)
-				break
-			}
-		}
-		return fmt.Errorf("message input blocked - gave up after %d retries", maxRetries)
+	// Get the input element using rod selector
+	inputElem, err2 := s.page.Element(".msg-form__contenteditable[contenteditable='true']")
+	err = err2
+	if err != nil {
+		s.logger.Warn("failed to get input element", "error", err)
+		return fmt.Errorf("failed to get message input: %w", err)
 	}
 
 	// Move mouse to input and click
@@ -1134,7 +1102,6 @@ func (s *Searcher) sendMessageInOverlay(name string) error {
 	}
 
 	var sendBtn *rod.Element
-	var err error
 	for _, sel := range sendBtnSelectors {
 		sendBtn, err = s.page.Element(sel)
 		if err == nil {
