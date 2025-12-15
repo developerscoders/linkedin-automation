@@ -225,16 +225,11 @@ func (s *Searcher) Search(ctx context.Context, criteria Criteria, onProfileFound
 				name := s.extractNameFromCard(card)
 				s.logger.Info("found Message button", "name", name)
 
-				// Click Message
-				box := messageBtn.MustShape().Box()
-				if err := s.mouse.MoveTo(s.page, stealth.Point{X: box.X + box.Width/2, Y: box.Y + box.Height/2}); err != nil {
-					s.logger.Warn("failed to move to message button", "error", err)
-				}
-				time.Sleep(200 * time.Millisecond)
-				messageBtn.MustClick()
+				// Click Message using JavaScript (prevents stale element panic)
+				messageBtn.MustEval(`() => this.click()`)
 
 				// Wait for chat overlay
-				time.Sleep(700 * time.Millisecond)
+				time.Sleep(2000 * time.Millisecond)
 
 				// Type and send message
 				if err := s.sendMessageInOverlay(name); err != nil {
@@ -1030,7 +1025,7 @@ func (s *Searcher) sendMessageInOverlay(name string) error {
 	s.logger.Info("using JavaScript to find message input")
 
 	inputFound, err := s.page.Eval(`() => {
-		const input = document.querySelector('div.msg-form__contenteditable[role="textbox"][contenteditable="true"]');
+		const input = document.querySelector('.msg-form__contenteditable[contenteditable="true"]');
 		if (input) {
 			input.focus();
 			return true;
@@ -1051,7 +1046,7 @@ func (s *Searcher) sendMessageInOverlay(name string) error {
 	s.logger.Info("message input found via JavaScript, getting element")
 
 	// Get the input element using rod selector
-	inputElem, err2 := s.page.Element("div.msg-form__contenteditable[role='textbox'][contenteditable='true']")
+	inputElem, err2 := s.page.Element(".msg-form__contenteditable[contenteditable='true']")
 	err = err2
 	if err != nil {
 		s.logger.Warn("failed to get input element", "error", err)
