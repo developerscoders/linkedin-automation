@@ -78,7 +78,6 @@ func (db *DB) GetConnectionRequest(ctx context.Context, profileID string) (*Conn
 	return &request, nil
 }
 
-// Helper to check status (replaces the simplified one we had)
 func (db *DB) GetRequestStatus(ctx context.Context, profileID string) (string, error) {
 	req, err := db.GetConnectionRequest(ctx, profileID)
 	if err != nil {
@@ -113,7 +112,7 @@ func (db *DB) GetRequestStats(ctx context.Context) (map[string]interface{}, erro
 	pipeline := []bson.M{
 		{
 			"$group": bson.M{
-				"_id": "$status",
+				"_id":   "$status",
 				"count": bson.M{"$sum": 1},
 			},
 		},

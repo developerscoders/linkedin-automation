@@ -55,13 +55,10 @@ func NewSearcher(page *rod.Page, scroller *stealth.Scroller, timing *stealth.Tim
 }
 
 func (s *Searcher) Search(ctx context.Context, criteria Criteria, onProfileFound func(card *rod.Element, profile *storage.Profile) error) error {
-	// CRITICAL FIX: Always start from a clean slate by navigating to LinkedIn feed/home
-	// This ensures the search bar is available and we're not stuck on old search results
 	s.logger.Info("navigating to LinkedIn feed for fresh search")
 
 	currentURL := s.page.MustInfo().URL
 	if !strings.Contains(currentURL, "linkedin.com/feed") && !strings.Contains(currentURL, "linkedin.com/in/") {
-		// Navigate to feed if we're not already there or on a profile
 		if err := s.page.Navigate("https://www.linkedin.com/feed/"); err != nil {
 			return fmt.Errorf("failed to navigate to feed: %w", err)
 		}
@@ -69,17 +66,14 @@ func (s *Searcher) Search(ctx context.Context, criteria Criteria, onProfileFound
 		s.timing.PageLoadWait()
 	}
 
-	// Wait for page to stabilize
 	time.Sleep(2 * time.Second)
 
-	// Locate Search Input with multiple fallback strategies
 	s.logger.Info("locating search input")
 	sb, err := s.locateSearchBar()
 	if err != nil {
 		return fmt.Errorf("search bar not found: %w", err)
 	}
 
-	// Build search query
 	searchQuery := strings.Join(criteria.Keywords, " ")
 	if criteria.Location != "" {
 		searchQuery += " " + criteria.Location
@@ -93,8 +87,6 @@ func (s *Searcher) Search(ctx context.Context, criteria Criteria, onProfileFound
 
 	s.logger.Info("typing search query", "query", searchQuery)
 
-	// CRITICAL FIX: Focus and clear the search bar properly
-	// Use stealth interactions
 	box := sb.MustShape().Box()
 
 	// Move mouse to search bar center
@@ -106,7 +98,6 @@ func (s *Searcher) Search(ctx context.Context, criteria Criteria, onProfileFound
 	sb.MustClick()
 	time.Sleep(500 * time.Millisecond)
 
-	// CRITICAL FIX: Triple-click to select all text (more reliable than SelectAllText)
 	sb.MustClick()
 	time.Sleep(100 * time.Millisecond)
 	sb.MustClick()
@@ -114,24 +105,19 @@ func (s *Searcher) Search(ctx context.Context, criteria Criteria, onProfileFound
 	sb.MustClick()
 	time.Sleep(200 * time.Millisecond)
 
-	// Alternative approach: Use keyboard shortcuts to clear
 	s.page.KeyActions().Press(input.ControlLeft, input.KeyA).MustDo()
 	time.Sleep(200 * time.Millisecond)
 	s.page.KeyActions().Press(input.Backspace).MustDo()
 	time.Sleep(300 * time.Millisecond)
 
-	// Human-like typing
 	if err := s.typer.TypeHumanLike(sb, searchQuery, 0); err != nil {
 		return fmt.Errorf("failed to type search query: %w", err)
 	}
 
-	// Wait before submitting
 	time.Sleep(800 * time.Millisecond)
 
-	// Submit search with Enter key
 	s.page.KeyActions().Press(input.Enter).MustDo()
 
-	// Wait for search results page to load
 	s.logger.Info("waiting for search results to load")
 	time.Sleep(3 * time.Second)
 	s.page.MustWaitLoad()
@@ -487,43 +473,34 @@ func (s *Searcher) findProfileCards() ([]*rod.Element, error) {
 
 // navigateToNextPage attempts to click the "Next" pagination button
 func (s *Searcher) navigateToNextPage() bool {
-	s.logger.Info("attempting to navigate to next page")
+	s.logger.Info("checking for next page button")
 
-	// Strategy 1: Find "Next" button by aria-label
-	nextBtn, err := s.page.Element("button[aria-label='Next']")
-	if err != nil {
-		s.logger.Warn("next button not found by aria-label")
+	var nextBtn *rod.Element
 
-		// Strategy 2: Find by text content
-		nextBtn, err = s.page.ElementR("button", "(?i)next")
-		if err != nil {
-			s.logger.Warn("next button not found by text")
-			return false
-		}
+	// Use data-testid from actual LinkedIn HTML (most reliable)
+	if btns, err := s.page.Elements("button[data-testid='pagination-controls-next-button-visible']"); err == nil && len(btns) > 0 {
+		nextBtn = btns.First()
+	} else if btns, err := s.page.Elements("button[aria-label='Next']"); err == nil && len(btns) > 0 {
+		nextBtn = btns.First()
 	}
 
-	// Check if disabled
+	if nextBtn == nil {
+		s.logger.Info("no next button found")
+		return false
+	}
+
 	if disabled, _ := nextBtn.Attribute("disabled"); disabled != nil {
 		s.logger.Info("next button is disabled")
 		return false
 	}
 
-	// Check if aria-disabled
 	if ariaDisabled, _ := nextBtn.Attribute("aria-disabled"); ariaDisabled != nil && *ariaDisabled == "true" {
 		s.logger.Info("next button is aria-disabled")
 		return false
 	}
 
-	// Move mouse and click
-	nextBox := nextBtn.MustShape().Box()
-	if err := s.mouse.MoveTo(s.page, stealth.Point{X: nextBox.X + nextBox.Width/2, Y: nextBox.Y + nextBox.Height/2}); err != nil {
-		s.logger.Warn("failed to move mouse to next button", "error", err)
-	}
-
-	time.Sleep(300 * time.Millisecond)
-	nextBtn.MustClick()
+	nextBtn.MustEval(`() => this.click()`)
 	s.logger.Info("clicked next page button")
-
 	return true
 }
 
@@ -531,17 +508,16 @@ func (s *Searcher) navigateToNextPage() bool {
 func (s *Searcher) navigateToFeed() error {
 	s.logger.Info("navigating to LinkedIn feed")
 
-	// Close any open message overlays first
+	// Close any open message overlays first (non-blocking)
 	closeSelectors := []string{
 		".msg-overlay-bubble-header__control--close-btn",
-		"button[data-control-name='overlay.close_conversation_window']",
 		"button[aria-label*='Close']",
 	}
 
 	for _, sel := range closeSelectors {
-		if closeBtn, err := s.page.Element(sel); err == nil {
+		if btns, err := s.page.Elements(sel); err == nil && len(btns) > 0 {
 			s.logger.Info("closing message overlay before navigation")
-			closeBtn.MustClick()
+			btns.First().MustEval(`() => this.click()`)
 			time.Sleep(300 * time.Millisecond)
 			break
 		}
@@ -554,7 +530,6 @@ func (s *Searcher) navigateToFeed() error {
 
 	s.page.MustWaitLoad()
 	time.Sleep(1500 * time.Millisecond)
-
 	s.logger.Info("successfully navigated to feed")
 	return nil
 }

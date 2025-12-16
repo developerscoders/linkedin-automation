@@ -40,13 +40,11 @@ func New(cfg *Config) (*DB, error) {
 		SetMinPoolSize(10).
 		SetMaxConnIdleTime(30 * time.Second)
 
-	// Connect to MongoDB
 	client, err := mongo.Connect(ctx, clientOptions)
 	if err != nil {
 		return nil, fmt.Errorf("failed to connect to MongoDB: %w", err)
 	}
 
-	// Ping to verify connection
 	if err := client.Ping(ctx, nil); err != nil {
 		return nil, fmt.Errorf("failed to ping MongoDB: %w", err)
 	}
@@ -64,7 +62,6 @@ func New(cfg *Config) (*DB, error) {
 		rateLimits:   database.Collection("rate_limits"),
 	}
 
-	// Create indexes
 	if err := db.createIndexes(ctx); err != nil {
 		return nil, fmt.Errorf("failed to create indexes: %w", err)
 	}

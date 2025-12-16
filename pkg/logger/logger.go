@@ -8,7 +8,6 @@ import (
 	"github.com/rs/zerolog"
 )
 
-// Logger is a wrapper around zerolog.Logger
 type Logger interface {
 	Debug(msg string, keyvals ...interface{})
 	Info(msg string, keyvals ...interface{})
@@ -21,7 +20,6 @@ type zeroLogger struct {
 	logger zerolog.Logger
 }
 
-// New creates a new logger instance
 func New(level string, format string) Logger {
 	zerolog.TimeFieldFormat = zerolog.TimeFormatUnix
 

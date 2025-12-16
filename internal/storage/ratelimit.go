@@ -16,7 +16,6 @@ func (db *DB) IncrementRateLimit(ctx context.Context, actionType string) error {
 	_, week := now.ISOWeek()
 	weekStr := fmt.Sprintf("%d-W%02d", now.Year(), week)
 
-	// Update daily count
 	filter := bson.M{
 		"action_type": actionType,
 		"date":        date,
@@ -34,7 +33,6 @@ func (db *DB) IncrementRateLimit(ctx context.Context, actionType string) error {
 		return fmt.Errorf("failed to update daily rate limit: %w", err)
 	}
 
-	// Update hourly count
 	filterHourly := bson.M{
 		"action_type": actionType,
 		"date":        date,
@@ -87,7 +85,6 @@ func (db *DB) GetRateLimitCount(ctx context.Context, actionType, period string) 
 }
 
 func (db *DB) CanPerformAction(ctx context.Context, actionType string, dailyLimit, hourlyLimit, weeklyLimit int) (bool, string, error) {
-	// Check hourly limit
 	hourlyCount, err := db.GetRateLimitCount(ctx, actionType, "hourly")
 	if err != nil {
 		return false, "", err
@@ -96,7 +93,6 @@ func (db *DB) CanPerformAction(ctx context.Context, actionType string, dailyLimi
 		return false, "hourly limit reached", nil
 	}
 
-	// Check daily limit
 	dailyCount, err := db.GetRateLimitCount(ctx, actionType, "daily")
 	if err != nil {
 		return false, "", err
@@ -105,7 +101,6 @@ func (db *DB) CanPerformAction(ctx context.Context, actionType string, dailyLimi
 		return false, "daily limit reached", nil
 	}
 
-	// Check weekly limit
 	weeklyCount, err := db.GetRateLimitCount(ctx, actionType, "weekly")
 	if err != nil {
 		return false, "", err

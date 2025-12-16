@@ -6,7 +6,6 @@ import (
 	"go.mongodb.org/mongo-driver/bson/primitive"
 )
 
-// Profile represents a LinkedIn profile
 type Profile struct {
 	ID           primitive.ObjectID     `bson:"_id,omitempty" json:"id"`
 	LinkedInID   string                 `bson:"linkedin_id" json:"linkedin_id"`
@@ -24,7 +23,6 @@ type Profile struct {
 	Metadata     map[string]interface{} `bson:"metadata,omitempty" json:"metadata,omitempty"`
 }
 
-// ConnectionRequest represents a connection request sent to a profile
 type ConnectionRequest struct {
 	ID           primitive.ObjectID `bson:"_id,omitempty" json:"id"`
 	ProfileID    string             `bson:"profile_id" json:"profile_id"` // Storing LinkedInID string for reference
@@ -38,7 +36,6 @@ type ConnectionRequest struct {
 	RetryCount   int                `bson:"retry_count" json:"retry_count"`
 }
 
-// Message represents a message sent to a connection
 type Message struct {
 	ID               primitive.ObjectID `bson:"_id,omitempty" json:"id"`
 	ProfileID        string             `bson:"profile_id" json:"profile_id"`
@@ -51,7 +48,6 @@ type Message struct {
 	ResponseReceived bool               `bson:"response_received" json:"response_received"`
 }
 
-// ActivityLog represents any action performed by the bot
 type ActivityLog struct {
 	ID        primitive.ObjectID     `bson:"_id,omitempty" json:"id"`
 	Action    string                 `bson:"action" json:"action"` // search, connect, message, login, etc.
@@ -62,7 +58,6 @@ type ActivityLog struct {
 	CreatedAt time.Time              `bson:"created_at" json:"created_at"`
 }
 
-// SessionState represents authentication session data
 type SessionState struct {
 	ID        primitive.ObjectID `bson:"_id,omitempty" json:"id"`
 	Key       string             `bson:"key" json:"key"` // "cookies", "last_login", etc.
@@ -70,7 +65,6 @@ type SessionState struct {
 	UpdatedAt time.Time          `bson:"updated_at" json:"updated_at"`
 }
 
-// RateLimitTracker tracks rate limiting data
 type RateLimitTracker struct {
 	ID          primitive.ObjectID `bson:"_id,omitempty" json:"id"`
 	ActionType  string             `bson:"action_type" json:"action_type"` // connect, message, search

@@ -17,7 +17,7 @@ type Authenticator struct {
 	page    *rod.Page
 	storage *storage.DB
 	logger  logger.Logger
-	stealth *stealth.Typer // Basic dependency for typing
+	stealth *stealth.Typer
 	mouse   *stealth.Mouse
 }
 
@@ -26,7 +26,7 @@ func NewAuthenticator(page *rod.Page, storage *storage.DB, logger logger.Logger,
 		page:    page,
 		storage: storage,
 		logger:  logger,
-		stealth: stealth.NewTyper(), // Just using Typer locally or inject it
+		stealth: stealth.NewTyper(),
 		mouse:   mouse,
 	}
 }
@@ -34,11 +34,11 @@ func NewAuthenticator(page *rod.Page, storage *storage.DB, logger logger.Logger,
 func (a *Authenticator) Login(ctx context.Context, email, password string) error {
 	a.logger.Info("starting login process")
 
-	// Navigate to Login Page
-	a.page.MustNavigate("https://www.linkedin.com/login")
+	if err := a.page.Navigate("https://www.linkedin.com/login"); err != nil {
+		return fmt.Errorf("failed to navigate to login page: %w", err)
+	}
 	a.page.MustWaitLoad()
 
-	// Human-like wait
 	time.Sleep(5 * time.Second)
 
 	moveToCenter := func(elem *rod.Element) {
@@ -46,16 +46,11 @@ func (a *Authenticator) Login(ctx context.Context, email, password string) error
 			return
 		}
 		box := elem.MustShape().Box()
-		// Move cursor to center of the element to mimic human behavior
 		if a.mouse != nil {
 			a.mouse.MoveTo(a.page, stealth.Point{X: box.X + box.Width/2, Y: box.Y + box.Height/2})
 		}
 	}
 
-	// Accept cookies if present (EU)
-	// Placeholder: check for cookie banner and click accept if needed
-
-	// Type Email
 	emailInput := a.page.MustElement("#username")
 	moveToCenter(emailInput)
 	if err := a.stealth.TypeHumanLike(emailInput, email, 0); err != nil {
@@ -64,7 +59,6 @@ func (a *Authenticator) Login(ctx context.Context, email, password string) error
 
 	time.Sleep(20 * time.Millisecond)
 
-	// Type Password
 	passInput := a.page.MustElement("#password")
 	moveToCenter(passInput)
 	if err := a.stealth.TypeHumanLike(passInput, password, 0); err != nil {
@@ -72,21 +66,14 @@ func (a *Authenticator) Login(ctx context.Context, email, password string) error
 	}
 
 	time.Sleep(2 * time.Second)
-	// wait := a.page.WaitNavigation(nil)
 
-	// Click Login
 	loginBtn := a.page.MustElement("button[type='submit'].btn__primary--large")
 	moveToCenter(loginBtn)
 	loginBtn.MustClick()
 
-	// Wait for navigation
-	// a.page.MustWaitLoad()
-	// a.page.MustWaitURL("**/feed/**")
-	// Check for CAPTCHA / 2FA / Verification
-	// Quick check for common selectors
 	if has, _, _ := a.page.Has("#captcha-internal"); has {
 		a.logger.Warn("CAPTCHA detected! Please solve it manually within 200 seconds.")
-		// Wait for manual solution
+
 		time.Sleep(60 * time.Second)
 	}
 

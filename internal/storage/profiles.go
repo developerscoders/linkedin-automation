@@ -20,15 +20,15 @@ func (db *DB) SaveProfile(ctx context.Context, profile *Profile) error {
 	filter := bson.M{"linkedin_id": profile.LinkedInID}
 	update := bson.M{
 		"$set": bson.M{
-			"name":        profile.Name,
-			"url":         profile.URL,
-			"title":       profile.Title,
-			"company":     profile.Company,
-			"location":    profile.Location,
-			"photo_url":   profile.PhotoURL,
-			"headline":    profile.Headline,
-			"about":       profile.About,
-			"updated_at":  profile.UpdatedAt,
+			"name":       profile.Name,
+			"url":        profile.URL,
+			"title":      profile.Title,
+			"company":    profile.Company,
+			"location":   profile.Location,
+			"photo_url":  profile.PhotoURL,
+			"headline":   profile.Headline,
+			"about":      profile.About,
+			"updated_at": profile.UpdatedAt,
 		},
 		"$setOnInsert": bson.M{
 			"discovered_at": profile.DiscoveredAt,
@@ -45,7 +45,6 @@ func (db *DB) SaveProfile(ctx context.Context, profile *Profile) error {
 		return fmt.Errorf("failed to save profile: %w", err)
 	}
 
-	// Get the ID if this was an insert
 	if result.UpsertedID != nil {
 		if oid, ok := result.UpsertedID.(primitive.ObjectID); ok {
 			profile.ID = oid
@@ -56,7 +55,7 @@ func (db *DB) SaveProfile(ctx context.Context, profile *Profile) error {
 }
 
 func (db *DB) GetUnprocessedProfiles(ctx context.Context, limit int) ([]Profile, error) {
-	// Find profiles that haven't been contacted yet
+
 	pipeline := []bson.M{
 		{
 			"$lookup": bson.M{

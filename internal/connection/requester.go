@@ -3,7 +3,7 @@ package connection
 import (
 	"context"
 	"fmt"
-	"strings" // Removed math/rand
+	"strings"
 	"time"
 
 	"linkedin-automation/internal/stealth"
@@ -28,7 +28,6 @@ type Requester struct {
 	logger logger.Logger
 }
 
-// Helper to satisfy constructor
 func NewRequester(page *rod.Page, limiter *AdaptiveLimiter,
 	mouse *stealth.Mouse, typer *stealth.Typer, timing *stealth.Timing, scroller *stealth.Scroller,
 	storage *storage.DB, logger logger.Logger) *Requester {
@@ -50,32 +49,23 @@ func (r *Requester) CanSend() (bool, string) {
 }
 
 func (r *Requester) SendRequest(ctx context.Context, profile storage.Profile, note string) error {
-	// 1. Check Rate Limit
 	if can, reason := r.limiter.CanSend(); !can {
 		return fmt.Errorf("rate limited: %s", reason)
 	}
 
-	// 2. Check if already sent
 	if sent, _ := r.tracker.IsAlreadySent(ctx, profile.LinkedInID); sent {
 		return fmt.Errorf("already sent to %s", profile.Name)
 	}
 
-	// 3. Navigate to profile
 	r.logger.Info("visiting profile", "profile", profile.Name)
 	r.page.MustNavigate(profile.URL)
 	r.page.MustWaitLoad()
 	r.timing.PageLoadWait()
 
-	// 4. Random Scroll to mimic viewing
 	r.scroller.RandomScroll(r.page)
 	time.Sleep(2 * time.Second)
 
-	// 5. Locate Connect Button
-	// Priority: aria-label="Connect", text content "Connect"
-
-	// Helper to find button by text logic or aria-label
 	findButton := func(labels ...string) (*rod.Element, error) {
-		// Try aria-label exact match first
 		for _, label := range labels {
 			if btn, err := r.page.Element(fmt.Sprintf("button[aria-label='%s']", label)); err == nil {
 				if v, _ := btn.Visible(); v {

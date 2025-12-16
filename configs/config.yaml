@@ -71,8 +71,8 @@ schedule:
 
 search:
   keywords:
-    - "lokesh lalwani"
     - "Software engineer"
+    - "lokesh lalwani"
   max_results_per_search: 100
   max_pages: 5
   cache_duration_hours: 24
